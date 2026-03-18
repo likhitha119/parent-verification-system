@@ -9,31 +9,21 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Allow multiple origins for development and production
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:5174",
-  process.env.FRONTEND_URL,
-  "https://eduparent-portal.vercel.app",
-].filter(Boolean);
-
-app.use(cors({ 
+app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (curl, mobile apps)
     if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.some(allowed => origin?.startsWith(allowed.replace(/\/$/, '')))) {
-      callback(null, true);
-    } else {
-      // Allow all Vercel preview deployments
-      if (origin?.includes('.vercel.app')) {
-        callback(null, true);
-      } else {
-        callback(null, true); // Allow all origins for now, restrict later
-      }
+    // Allow localhost dev and all Vercel deployments
+    if (
+      origin.includes('localhost') ||
+      origin.includes('.vercel.app') ||
+      origin === process.env.FRONTEND_URL
+    ) {
+      return callback(null, true);
     }
+    callback(null, true); // open for now
   },
-  credentials: true
+  credentials: true,
 }));
 app.use(express.json());
 

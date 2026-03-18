@@ -37,44 +37,26 @@ const createOtp = () =>
 
 /* ---------------- EMAIL CONFIG ---------------- */
 
-const emailHost = process.env.EMAIL_HOST;
-const emailPort = Number(process.env.EMAIL_PORT) || 587;
-const emailSecure = process.env.EMAIL_SECURE === "true";
 const emailUser = process.env.EMAIL_USER;
 const emailPass = process.env.EMAIL_PASS;
-const emailSender =
-  process.env.EMAIL_FROM || '"EduParent" <no-reply@eduparent.com>';
+const emailSender = `"EduParent" <${emailUser}>`;
 
-let emailTransporter = null;
-
-const createEmailTransporter = async () => {
-  if (emailHost && emailUser && emailPass) {
-    console.log(`Email transporter using ${emailHost}`);
-
-    return nodemailer.createTransport({
-      host: emailHost,
-      port: emailPort,
-      secure: emailSecure,
-      auth: {
-        user: emailUser,
-        pass: emailPass,
-      },
-    });
+const createEmailTransporter = () => {
+  if (!emailUser || !emailPass) {
+    console.error("EMAIL_USER or EMAIL_PASS not set in environment variables!");
+    return null;
   }
-
-  const testAccount = await nodemailer.createTestAccount();
-  console.log(
-    "No SMTP credentials detected, falling back to Ethereal test account",
-    testAccount.user
-  );
-
+  console.log(`Email transporter ready for ${emailUser}`);
   return nodemailer.createTransport({
-    host: testAccount.smtp.host,
-    port: testAccount.smtp.port,
-    secure: testAccount.smtp.secure,
-    auth: testAccount,
+    service: "gmail",
+    auth: {
+      user: emailUser,
+      pass: emailPass,
+    },
   });
 };
+
+const emailTransporter = createEmailTransporter();
 
 /* ---------------- MOCK DATA ---------------- */
 
@@ -230,9 +212,13 @@ app.post("/api/send-otp", async (req, res) => {
   const email = typeof rawEmail === "string" ? rawEmail.trim() : "";
 
   if (!email) {
-    return res.status(400).json({
+    return res.status(400).json({ success: false, error: "Email address required" });
+  }
+
+  if (!emailTransporter) {
+    return res.status(500).json({
       success: false,
-      error: "Email address required",
+      error: "Email service not configured. Please contact admin.",
     });
   }
 
@@ -244,40 +230,23 @@ app.post("/api/send-otp", async (req, res) => {
     expires: Date.now() + OTP_TTL_MS,
   });
 
-  const sendViaEmail = async () => {
+  try {
     await emailTransporter.sendMail({
       from: emailSender,
       to: email,
       subject: "Your EduParent OTP",
-      text: `Your EduParent OTP is: ${otp}`,
+      text: `Your EduParent OTP is: ${otp}. It expires in 5 minutes.`,
       html: `<p>Your EduParent OTP is <strong>${otp}</strong>. It expires in 5 minutes.</p>`,
     });
-  };
 
-  try {
-    if (emailTransporter) {
-      await sendViaEmail();
-
-      return res.json({
-        success: true,
-        message: "OTP sent to your email.",
-      });
-    }
-
-    console.log(`OTP for ${email}: ${otp}`);
-
-    return res.json({
-      success: true,
-      message: "OTP generated (check server console).",
-    });
+    console.log(`OTP sent to ${email}`);
+    return res.json({ success: true, message: "OTP sent to your email." });
   } catch (err) {
     console.error("Email send failed:", err.message);
-
     OTP_STORE.delete(normalizedEmail);
-
     return res.status(500).json({
       success: false,
-      error: "Failed to send OTP email.",
+      error: "Failed to send OTP. Please check your email address and try again.",
       details: err.message,
     });
   }
@@ -377,19 +346,9 @@ app.use((req, res) => {
 
 /* ---------------- START SERVER ---------------- */
 
-const startServer = async () => {
-  try {
-    emailTransporter = await createEmailTransporter();
-  } catch (err) {
-    console.error(
-      "Failed to set up email transporter; OTP emails will be logged to the console.",
-      err
-    );
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  if (!emailTransporter) {
+    console.warn("WARNING: Email transporter not initialized. OTPs will not be sent.");
   }
-
-  app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
-};
-
-startServer();
+});

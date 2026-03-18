@@ -14,6 +14,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
   process.env.FRONTEND_URL,
+  "https://eduparent-portal.vercel.app",
 ].filter(Boolean);
 
 app.use(cors({ 
@@ -21,10 +22,15 @@ app.use(cors({
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes("*")) {
+    if (allowedOrigins.some(allowed => origin?.startsWith(allowed.replace(/\/$/, '')))) {
       callback(null, true);
     } else {
-      callback(null, true); // Allow all origins for now, restrict later
+      // Allow all Vercel preview deployments
+      if (origin?.includes('.vercel.app')) {
+        callback(null, true);
+      } else {
+        callback(null, true); // Allow all origins for now, restrict later
+      }
     }
   },
   credentials: true

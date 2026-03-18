@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import './Login.css';
 import { Lock, UserSquare2, Mail, Send, ShieldCheck, Info } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { API_URL } from '../config/api';
 
 const floatingMetrics = [
   { label: 'Total Enrolled', value: '15,000+', meta: 'across 8 colleges' },
@@ -27,7 +28,7 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/send-otp', {
+      const response = await fetch(`${API_URL}/api/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim() }),
@@ -61,7 +62,7 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/verify-otp', {
+      const response = await fetch(`${API_URL}/api/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
